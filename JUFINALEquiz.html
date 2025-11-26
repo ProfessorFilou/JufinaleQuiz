@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Neo Quiz</title>
+  <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/29/29302.png" type="image/png" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    body {
+      margin: 0;
+      font-family: "Poppins", sans-serif;
+      background: linear-gradient(135deg, #1b1f3b, #3c4b6e);
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .quiz-card {
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(16px);
+      padding: 45px;
+      border-radius: 25px;
+      width: 90%;
+      max-width: 600px;
+      box-shadow: 0 0 60px rgba(0, 0, 0, 0.45);
+      text-align: center;
+      animation: fade 0.7s ease;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      position: relative;
+    }
+
+    @keyframes fade {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    h2 {
+      font-size: 2.2rem;
+      margin-bottom: 20px;
+      font-weight: 700;
+      text-shadow: 0 0 10px rgba(255,255,255,0.3);
+    }
+
+    .btn-main {
+      background: #6366f1;
+      color: white;
+      padding: 15px 25px;
+      border-radius: 14px;
+      border: none;
+      cursor: pointer;
+      font-size: 1.1rem;
+      transition: 0.2s;
+      width: 100%;
+      box-shadow: 0 0 15px rgba(99,102,241,0.5);
+    }
+
+    .btn-main:hover {
+      transform: scale(1.05);
+      background: #4f46e5;
+    }
+
+    .question {
+      margin-top: 25px;
+      font-size: 1.35rem;
+      font-weight: 600;
+      min-height: 40px;
+      text-shadow: 0 0 8px rgba(255,255,255,0.2);
+    }
+
+    .answers button {
+      margin-top: 12px;
+      background: rgba(255, 255, 255, 0.18);
+      width: 100%;
+      border: none;
+      padding: 14px;
+      border-radius: 12px;
+      color: #fff;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .answers button:hover {
+      background: rgba(255, 255, 255, 0.32);
+      transform: scale(1.04);
+    }
+
+    .correct {
+      background: #22c55e !important;
+      color: #fff;
+    }
+
+    .wrong {
+      background: #ef4444 !important;
+      color: #fff;
+    }
+
+    .result {
+      margin-top: 25px;
+      font-size: 1.5rem;
+      font-weight: 600;
+      opacity: 0;
+      transition: 0.5s;
+      text-shadow: 0 0 10px rgba(255,255,255,0.3);
+    }
+
+    .result.show {
+      opacity: 1;
+    }
+
+    .progress {
+      width: 100%;
+      height: 12px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-top: 20px;
+    }
+
+    .bar {
+      height: 100%;
+      width: 0%;
+      background: #6366f1;
+      transition: width 0.4s ease;
+    }
+
+    .jufi-link {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      background: #6366f1;
+      padding: 10px 18px;
+      border-radius: 12px;
+      text-decoration: none;
+      color: #fff;
+      font-weight: 600;
+      box-shadow: 0 0 12px rgba(99,102,241,0.5);
+      transition: 0.2s;
+      z-index: 999;
+    }
+
+    .jufi-link:hover {
+      transform: scale(1.05);
+      background: #4f46e5;
+    }
+
+    .logo-right {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      cursor: pointer;
+      height: 50px;
+      z-index: 999;
+      transition: transform 0.2s;
+    }
+
+    .logo-right:hover {
+      transform: scale(1.1);
+    }
+
+    footer {
+      text-align: center;
+      margin-top: 40px;
+      padding: 20px;
+      color: #ffffffaa;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <a href="https://www.bkjff.de/oberbayern/" target="_blank" class="jufi-link">Zur JUFINALE</a>
+  <img src="JUFINALErobi.png" alt="Robi Logo" class="logo-right" onclick="easterEgg()" />
+  <div class="quiz-card">
+    <h2 id="title">Quiz starten</h2>
+    <button class="btn-main" id="startBtn">Start</button>
+    <div class="progress"><div class="bar" id="progressBar"></div></div>
+    <div class="question" id="question"></div>
+    <div class="answers" id="answers"></div>
+    <div class="result" id="result"></div>
+    <button class="btn-main" id="restartBtn" style="display:none;">Nochmal spielen</button>
+  </div>
+  <footer>© Finn v. Khreninger ✕ JUFINALE</footer>
+
+  <script>
+    const quiz = [
+      { question: "Was ist die JUFINALE?", answers: ["Ein internationaler Wettbewerb für Hollywoodfilme","Ein oberbayerisches Festival für Jugend- und Nachwuchsfilmer*innen","Ein Musikfestival für junge Bands","Eine Games-Convention für Jugendliche"], correct: 1 },
+      { question: "Wer darf bei der JUFINALE Filme einreichen?", answers: ["Professionelle Regisseur*innen über 25","Alle Personen unter 18 Jahren weltweit","Jugendliche und junge Erwachsene aus Oberbayern","Nur Filmhochschul-Studierende"], correct: 2 },
+      { question: "Welches Ziel verfolgt die JUFINALE besonders?", answers: ["Preisverleihung für die teuersten Produktionen","Förderung der Filmkultur unter jungen Kreativen","Verkauf von Filmtechnik","Rekrutierung für Castingagenturen"], correct: 1 },
+      { question: "Was gehört typischerweise zu einem Jugendfilm?", answers: ["Nur Animationsfiguren und Fantasy-Welten","Überwiegend Themen aus dem Alltag junger Menschen","Ausschließlich historische Stoffe","Filme mit einer Länge von exakt 90 Minuten"], correct: 1 }
+    ];
+
+    let current = 0;
+    let score = 0;
+    const startBtn = document.getElementById("startBtn");
+    const questionEl = document.getElementById("question");
+    const answersEl = document.getElementById("answers");
+    const resultEl = document.getElementById("result");
+    const restartBtn = document.getElementById("restartBtn");
+    const progressBar = document.getElementById("progressBar");
+    const title = document.getElementById("title");
+
+    startBtn.onclick = () => { startBtn.style.display = "none"; title.textContent = "Quiz"; showQuestion(); };
+
+    function showQuestion() {
+      const q = quiz[current];
+      questionEl.textContent = q.question;
+      answersEl.innerHTML = "";
+      progressBar.style.width = `${(current / quiz.length) * 100}%`;
+      q.answers.forEach((answer,index)=>{
+        const btn=document.createElement("button");
+        btn.textContent=answer;
+        btn.onclick=()=>selectAnswer(btn,index);
+        answersEl.appendChild(btn);
+      });
+    }
+
+    function selectAnswer(btn,index){
+      const correct=quiz[current].correct;
+      Array.from(answersEl.children).forEach(b=>b.disabled=true);
+      if(index===correct){btn.classList.add("correct");score++;}
+      else{btn.classList.add("wrong");answersEl.children[correct].classList.add("correct");}
+      setTimeout(()=>{current++;if(current<quiz.length)showQuestion();else showResult();},900);
+    }
+
+    function showResult(){
+      questionEl.textContent="";answersEl.innerHTML="";progressBar.style.width="100%";
+      let cat=score===5?"Alleswisser":score>=3?"Gut dabei":score>=1?"Noch Luft nach oben":"Anfänger";
+      resultEl.textContent=`Du hast ${score} von ${quiz.length} Punkten! Kategorie: ${cat}`;
+      resultEl.classList.add("show");restartBtn.style.display="block";
+    }
+
+    restartBtn.onclick=()=>{current=0;score=0;resultEl.classList.remove("show");restartBtn.style.display="none";startBtn.style.display="block";title.textContent="Quiz starten";progressBar.style.width="0%";};
+
+    function easterEgg(){
+      alert("🎬 Geheimlevel freigeschaltet!\n\nDu hast das geheime JUFINALE-Robot-Easter-Egg gefunden! 😄");
+    }
+  </script>
+</body>
+</html>
