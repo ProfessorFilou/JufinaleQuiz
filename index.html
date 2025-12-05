@@ -1,0 +1,254 @@
+import os
+import tkinter as tk
+from tkinter import ttk, filedialog, messagebox
+import threading
+import hashlib
+import time
+import shutil
+
+# ==================== Pfade ====================
+BASE = os.path.join(os.path.expanduser("~"), "FinnScan")
+QUARANTINE = os.path.join(BASE, "quarantine")
+LOGS = os.path.join(BASE, "logs")
+SETTINGS = os.path.join(BASE, "settings")
+for p in (BASE, QUARANTINE, LOGS, SETTINGS):
+    os.makedirs(p, exist_ok=True)
+
+VERSION = "FinnScan V1.2 – Color Edition"
+
+# ==================== Farben (Avira-Style) ====================
+COLORS = {
+    "bg": "#f8f9fc",
+    "sidebar": "#2d3748",
+    "sidebar_hover": "#4a5568",
+    "primary": "#00c9b7",      # Avira-Türkis
+    "primary_dark": "#00a895",
+    "success": "#48bb78",
+    "danger": "#f56565",
+    "warning": "#ed8936",
+    "card": "#ffffff",
+    "text": "#2d3748",
+    "text_light": "#718096",
+}
+
+# ==================== Core Funktionen ====================
+def file_hash(path):
+    try:
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(4096), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    except:
+        return None
+
+def should_skip(path):
+    ignore = ["c:/windows", "c:/program files", "c:/program files (x86)",
+              "c:/$recycle.bin", "c:/system volume information"]
+    return path.lower().startswith(tuple(ignore))
+
+def scan_folder(path, callback):
+    for root, _, files in os.walk(path):
+        if should_skip(root):
+            continue
+        for f in files:
+            callback(os.path.join(root, f))
+
+def add_to_quarantine(path):
+    try:
+        target = os.path.join(QUARANTINE, os.path.basename(path))
+        shutil.copy2(path, target)
+        os.remove(path)
+        return True
+    except:
+        return False
+
+# ==================== Hauptapp ====================
+class FinnScanApp(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title(VERSION)
+        self.geometry("1100x700")
+        self.configure(bg=COLORS["bg"])
+
+        style = ttk.Style()
+        style.theme_use("clam")
+
+        # Sidebar
+        self.sidebar = tk.Frame(self, bg=COLORS["sidebar"], width=240)
+        self.sidebar.pack(side="left", fill="y")
+        self.sidebar.pack_propagate(False)
+
+        self.main = tk.Frame(self, bg=COLORS["bg"])
+        self.main.pack(side="right", fill="both", expand=True, padx=25, pady=25)
+
+        self.create_sidebar()
+        self.show_dashboard()
+
+    def create_sidebar(self):
+        tk.Label(self.sidebar, text="FinnScan", font=("Segoe UI", 26, "bold"),
+                 fg=COLORS["primary"], bg=COLORS["sidebar"]).pack(pady=40)
+
+        menu = [
+            ("Dashboard", self.show_dashboard),
+            ("Schnellscan", self.show_quickscan),
+            ("Vollständiger Scan", self.show_fullscan),
+            ("Benutzerdefiniert", self.show_customscan),
+            ("Quarantäne", self.show_quarantine),
+            ("Verlauf", self.show_logs),
+            ("Einstellungen", self.show_settings),
+        ]
+
+        for text, cmd in menu:
+            btn = tk.Button(self.sidebar, text=text, font=("Segoe UI", 12), fg="white",
+                            bg=COLORS["sidebar"], activebackground=COLORS["sidebar_hover"],
+                            bd=0, anchor="w", padx=35, pady=12, command=cmd)
+            btn.pack(fill="x")
+            btn.bind("<Enter>", lambda e, b=btn: b.config(bg=COLORS["sidebar_hover"]))
+            btn.bind("<Leave>", lambda e, b=btn: b.config(bg=COLORS["sidebar"]))
+
+        tk.Label(self.sidebar, text=VERSION, font=("Segoe UI", 9), fg="#a0aec0", bg=COLORS["sidebar"]).pack(side="bottom", pady=20)
+
+    def clear_main(self):
+        for w in self.main.winfo_children():
+            w.destroy()
+
+    def create_stat_card(self, parent, title, value, color):
+        card = tk.Frame(parent, bg=COLORS["card"], relief="flat", highlightbackground="#e2e8f0", highlightthickness=2)
+        card.pack(side="left", padx=12, ipadx=25, ipady=20, expand=True, fill="x")
+
+        tk.Label(card, text=title, font=("Segoe UI", 11), fg=COLORS["text_light"], bg=COLORS["card"]).pack()
+        tk.Label(card, text=value, font=("Segoe UI", 26, "bold"), fg=color, bg=COLORS["card"]).pack(pady=(8,0))
+
+    def show_dashboard(self):
+        self.clear_main()
+
+        tk.Label(self.main, text="Willkommen bei FinnScan!", font=("Segoe UI", 28, "bold"),
+                 fg=COLORS["primary"], bg=COLORS["bg"]).pack(anchor="w", pady=(0,30))
+
+        stats = tk.Frame(self.main, bg=COLORS["bg"])
+        stats.pack(fill="x", pady=20)
+
+        # Letzter Scan aus Log lesen
+        last = "Noch kein Scan"
+        log_path = os.path.join(LOGS, "scan.log")
+        if os.path.exists(log_path):
+            try:
+                with open(log_path, "r", encoding="utf-8") as f:
+                    lines = f.readlines()
+                    if lines:
+                        last = lines[-1].strip().split("|")[0].strip()
+            except:
+                pass
+
+        self.create_stat_card(stats, "Letzter Scan", last, COLORS["primary"])
+        self.create_stat_card(stats, "Bedrohungen heute", "0", COLORS["danger"])
+        self.create_stat_card(stats, "In Quarantäne", str(len(os.listdir(QUARANTINE))), COLORS["warning"])
+
+        btns = tk.Frame(self.main, bg=COLORS["bg"])
+        btns.pack(pady=50)
+
+        tk.Button(btns, text="Schnellscan starten", font=("Segoe UI", 14, "bold"), fg="white",
+                  bg=COLORS["primary"], activebackground=COLORS["primary_dark"], bd=0, padx=40, pady=18,
+                  command=self.show_quickscan).pack(side="left", padx=20)
+
+        tk.Button(btns, text="Vollscan starten", font=("Segoe UI", 14, "bold"), fg="white",
+                  bg=COLORS["danger"], activebackground="#c53030", bd=0, padx=40, pady=18,
+                  command=self.show_fullscan).pack(side="left", padx=20)
+
+    def scan_window(self, path, title):
+        self.clear_main()
+        tk.Label(self.main, text=title, font=("Segoe UI", 24, "bold"), fg=COLORS["text"], bg=COLORS["bg"]).pack(anchor="w", pady=(0,20))
+
+        progress = ttk.Progressbar(self.main, length=900, mode="indeterminate")
+        progress.pack(pady=20)
+        progress.start()
+
+        log_box = tk.Text(self.main, height=28, font=("Consolas", 10), bg="#1a1a2e", fg="#00ffaa", relief="flat")
+        log_box.pack(fill="both", expand=True, padx=10)
+
+        threats = 0
+        def log(msg):
+            log_box.insert("end", msg + "\n")
+            log_box.see("end")
+
+        def run_scan():
+            nonlocal threats
+            def process(p):
+                nonlocal threats
+                log(f"Scanne: {p}")
+                h = file_hash(p)
+                if h and h.startswith("00000"):
+                    threats += 1
+                    log(f"BEDROHUNG GEFUNDEN: {p}")
+                    if add_to_quarantine(p):
+                        log("→ In Quarantäne verschoben")
+                time.sleep(0.005)  # sieht flüssiger aus
+
+            scan_folder(path, process)
+            progress.stop()
+            with open(os.path.join(LOGS, "scan.log"), "a", encoding="utf-8") as f:
+                f.write(f"{time.ctime()} | {title} | {threats} Bedrohungen\n")
+            messagebox.showinfo("Scan fertig!", f"Abgeschlossen!\nBedrohungen gefunden: {threats}")
+            self.show_dashboard()
+
+        threading.Thread(target=run_scan, daemon=True).start()
+
+    def show_quickscan(self): self.scan_window(os.path.expanduser("~"), "Schnellscan – Benutzerordner")
+    def show_fullscan(self): self.scan_window("C:/", "Vollständiger Scan – Gesamtes System")
+    def show_customscan(self):
+        p = filedialog.askdirectory()
+        if p: self.scan_window(p, f"Scan: {p}")
+
+    def show_quarantine(self):
+        self.clear_main()
+        tk.Label(self.main, text="Quarantäne", font=("Segoe UI", 24, "bold"), fg=COLORS["text"], bg=COLORS["bg"]).pack(anchor="w", pady=(0,20))
+
+        files = os.listdir(QUARANTINE)
+        if not files:
+            tk.Label(self.main, text="Alles sauber – keine Dateien in Quarantäne", font=("Segoe UI", 16), fg=COLORS["text_light"]).pack(pady=100)
+            return
+
+        for f in files:
+            frame = tk.Frame(self.main, bg=COLORS["card"], highlightbackground="#e2e8f0", highlightthickness=2)
+            frame.pack(fill="x", pady=6, padx=10, ipady=10)
+
+            tk.Label(frame, text=f, font=("Consolas", 11), fg=COLORS["text"], bg=COLORS["card"]).pack(side="left", padx=20)
+
+            tk.Button(frame, text="Wiederherstellen", bg=COLORS["success"], fg="white", bd=0, padx=20, pady=8,
+                      command=lambda p=os.path.join(QUARANTINE, f): self.restore(p)).pack(side="right", padx=5)
+            tk.Button(frame, text="Endgültig löschen", bg=COLORS["danger"], fg="white", bd=0, padx=20, pady=8,
+                      command=lambda p=os.path.join(QUARANTINE, f): self.delete(p)).pack(side="right")
+
+    def restore(self, path):
+        dest = filedialog.askdirectory()
+        if dest:
+            shutil.copy2(path, os.path.join(dest, os.path.basename(path)))
+            os.remove(path)
+            messagebox.showinfo("Erfolg", "Datei wiederhergestellt!")
+            self.show_quarantine()
+
+    def delete(self, path):
+        if messagebox.askyesno("Löschen?", "Datei wirklich endgültig entfernen?"):
+            os.remove(path)
+            self.show_quarantine()
+
+    def show_logs(self):
+        self.clear_main()
+        tk.Label(self.main, text="Scan-Verlauf", font=("Segoe UI", 24, "bold"), fg=COLORS["text"]).pack(anchor="w", pady=(0,20))
+        txt = tk.Text(self.main, font=("Consolas", 10), bg="#0f0f1e", fg="#a0aec0")
+        txt.pack(fill="both", expand=True, padx=10, pady=10)
+        if os.path.exists(os.path.join(LOGS, "scan.log")):
+            with open(os.path.join(LOGS, "scan.log"), "r", encoding="utf-8") as f:
+                txt.insert("end", f.read())
+
+    def show_settings(self):
+        self.clear_main()
+        tk.Label(self.main, text="Einstellungen", font=("Segoe UI", 24, "bold"), fg=COLORS["text"]).pack(anchor="w", pady=(0,20))
+        tk.Label(self.main, text="Bald kommen hier coole Features:\n• Dark Mode Umschalter\n• Echtzeitschutz\n• Automatische Updates\n• Design-Themen", 
+                 font=("Segoe UI", 14), fg=COLORS["text_light"], justify="left").pack(anchor="w", padx=30, pady=20)
+
+# ==================== START ====================
+if __name__ == "__main__":
+    app = FinnScanApp()
+    app.mainloop()
